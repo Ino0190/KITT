@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KITT Dashboard with Radio</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* レトロラジオ表示部 */
+        .radio-display {
+            background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+            border: 3px solid #333;
+            border-radius: 8px;
+            padding: 15px 25px;
+            margin-bottom: 20px;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.8),
+                        0 0 20px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .radio-display::before {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            right: 5px;
+            bottom: 5px;
+            border: 1px solid #222;
+            border-radius: 5px;
+            pointer-events: none;
+        }
+
+        .display-screen {
+            background: linear-gradient(180deg, #0a2010 0%, #051008 100%);
+            border: 2px solid #1a1a1a;
+            border-radius: 4px;
+            padding: 12px 20px;
+            min-height: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            box-shadow: inset 0 0 20px rgba(0,50,0,0.3);
+        }
+
+        .station-name {
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0,255,0,0.8),
+                         0 0 20px rgba(0,255,0,0.4);
+            letter-spacing: 2px;
+            text-align: center;
+            animation: flicker 0.1s infinite alternate;
+        }
+
+        .station-freq {
+            color: #00cc00;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            text-shadow: 0 0 8px rgba(0,200,0,0.6);
+            text-align: center;
+            margin-top: 4px;
+            opacity: 0.8;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 1; }
+            100% { opacity: 0.95; }
+        }
+
+        .display-off .station-name,
+        .display-off .station-freq {
+            color: #003300;
+            text-shadow: none;
+            animation: none;
+        }
+
+        .radio-indicators {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            padding: 0 10px;
+        }
+
+        .indicator-led {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #330000;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .indicator-led.active {
+            background: #ff0000;
+            box-shadow: 0 0 8px rgba(255,0,0,0.8),
+                        inset 0 1px 2px rgba(255,255,255,0.3);
+        }
+
+        .indicator-led.stereo {
+            background: #003300;
+        }
+
+        .indicator-led.stereo.active {
+            background: #00ff00;
+            box-shadow: 0 0 8px rgba(0,255,0,0.8),
+                        inset 0 1px 2px rgba(255,255,255,0.3);
+        }
+
+        .dashboard {
+            background: #0a0a0a;
+            border: 4px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 0 40px rgba(0,0,0,0.9);
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 90px 1fr 90px;
+            gap: 25px;
+            align-items: stretch;
+        }
+
+        .left-buttons, .right-buttons {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100%;
+            padding: 48px 0;
+        }
+
+        .side-button {
+            width: 90px;
+            height: 48px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 4px;
+            font-size: 15px;
+            font-weight: bold;
+            color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            cursor: pointer;
+            box-shadow: 0 0 0 3px #000, 0 0 0 4px #333,
+                        inset 2px 2px 4px rgba(0, 0, 0, 0.3),
+                        inset -2px -2px 4px rgba(255, 255, 255, 0.1);
+            line-height: 0.9;
+            transform: scaleY(1.3);
+            position: relative;
+            transition: all 0.2s;
+        }
+
+        .side-button:active {
+            transform: scaleY(1.25);
+        }
+
+        .side-button.yellow {
+            background: rgba(220, 200, 30, 0.5);
+        }
+
+        .side-button.orange {
+            background: rgba(200, 60, 60, 0.5);
+        }
+
+        .side-button.active {
+            box-shadow: 0 0 0 3px #000, 0 0 0 4px #333,
+                        inset 2px 2px 4px rgba(0, 0, 0, 0.3),
+                        inset -2px -2px 4px rgba(255, 255, 255, 0.1);
+        }
+
+        .side-button.yellow.active {
+            background: rgba(220, 200, 30, 0.9);
+            box-shadow: 0 0 0 3px #000, 0 0 0 4px #333,
+                        0 0 15px rgba(220, 200, 30, 0.6),
+                        inset 2px 2px 4px rgba(0, 0, 0, 0.3),
+                        inset -2px -2px 4px rgba(255, 255, 255, 0.1);
+        }
+
+        .side-button.orange.active {
+            background: rgba(200, 60, 60, 0.9);
+            box-shadow: 0 0 0 3px #000, 0 0 0 4px #333,
+                        0 0 15px rgba(200, 60, 60, 0.6),
+                        inset 2px 2px 4px rgba(0, 0, 0, 0.3),
+                        inset -2px -2px 4px rgba(255, 255, 255, 0.1);
+        }
+
+        .center-section {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 8px;
+        }
+
+        .top-bar, .bottom-bar {
+            width: 100%;
+            height: 6px;
+            background: linear-gradient(180deg, #3a3a3a 0%, #2a2a2a 100%);
+            border-radius: 3px;
+            box-shadow: inset 0 2px 3px rgba(0,0,0,0.5);
+        }
+
+        .bars-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+            height: 380px;
+            background: #000;
+            border-radius: 8px;
+            padding: 15px 30px;
+        }
+
+        .bar {
+            width: 50px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .bar-half {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            width: 100%;
+        }
+
+        .bar-half.top {
+            flex-direction: column-reverse;
+        }
+
+        .segment {
+            width: 100%;
+            height: 18px;
+            background: #330000;
+            border-radius: 3px;
+            box-shadow: none;
+            transition: all 0.2s ease-out;
+        }
+
+        .segment.center-segment {
+            margin: 2px 0;
+            background: #330000;
+            box-shadow: none;
+        }
+
+        .segment.active {
+            background: #ff3333 !important;
+            box-shadow: 0 0 30px rgba(255, 50, 50, 1), 0 0 60px rgba(255, 50, 50, 0.8) !important;
+            transition: none !important;
+        }
+
+        .segment.fade-1 {
+            background: #990000 !important;
+            box-shadow: 0 0 10px rgba(255, 0, 0, 0.4) !important;
+            transition: all 0.12s ease-out !important;
+        }
+
+        .segment.fade-2 {
+            background: #660000 !important;
+            box-shadow: 0 0 5px rgba(255, 0, 0, 0.2) !important;
+            transition: all 0.15s ease-out !important;
+        }
+
+        .segment.fade-3 {
+            background: #440000 !important;
+            box-shadow: none !important;
+            transition: all 0.18s ease-out !important;
+        }
+
+        .segment.fade-4 {
+            background: #330000 !important;
+            box-shadow: none !important;
+            transition: all 0.2s ease-out !important;
+        }
+
+        .bottom-controls {
+            display: grid;
+            grid-template-columns: 15px 1fr 120px;
+            gap: 15px;
+            align-items: stretch;
+            margin-top: 15px;
+            padding: 0 30px;
+        }
+
+        .yellow-indicator {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            justify-content: flex-start;
+            align-self: start;
+        }
+
+        .indicator-segment {
+            width: 15px;
+            height: 48px;
+            background: rgba(220, 200, 30, 0.5);
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 0 0 2px #000, 0 0 0 3px #333,
+                        inset 1px 1px 3px rgba(0, 0, 0, 0.3),
+                        inset -1px -1px 3px rgba(255, 255, 255, 0.1);
+            position: relative;
+            transform: scaleY(1.3);
+        }
+
+        .spacer {
+            min-width: 1px;
+        }
+
+        .mode-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .mode-button {
+            width: 100%;
+            height: 48px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 17px;
+            color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            cursor: pointer;
+            box-shadow: 0 0 0 3px #000, 0 0 0 4px #333,
+                        inset 2px 2px 4px rgba(0, 0, 0, 0.3),
+                        inset -2px -2px 4px rgba(255, 255, 255, 0.1);
+            line-height: 0.9;
+            padding: 5px 10px;
+            transform: scaleY(1.3);
+            position: relative;
+            transition: all 0.2s;
+        }
+
+        .mode-button:active {
+            transform: scaleY(1.25);
+        }
+
+        .mode-button.green {
+            background: rgba(60, 160, 170, 0.5);
+        }
+
+        .mode-button.yellow {
+            background: rgba(220, 200, 30, 0.5);
+        }
+
+        .mode-button.red {
+            background: rgba(200, 60, 60, 0.5);
+        }
+
+        .mode-button.active {
+            box-shadow: 0 0 0 3px #000, 0 0 0 4px #333,
+                        inset 2px 2px 4px rgba(0, 0, 0, 0.3),
+                        inset -2px -2px 4px rgba(255, 255, 255, 0.1);
+        }
+
+        .mode-button.green.active {
+            background: rgba(60, 160, 170, 0.9);
+            box-shadow: 0 0 0 3px #000, 0 0 0 4px #333,
+                        0 0 20px rgba(60, 160, 170, 0.8),
+                        inset 2px 2px 4px rgba(0, 0, 0, 0.3),
+                        inset -2px -2px 4px rgba(255, 255, 255, 0.1);
+        }
+
+        .mode-button.yellow.active {
+            background: rgba(220, 200, 30, 0.9);
+            box-shadow: 0 0 0 3px #000, 0 0 0 4px #333,
+                        0 0 20px rgba(220, 200, 30, 0.8),
+                        inset 2px 2px 4px rgba(0, 0, 0, 0.3),
+                        inset -2px -2px 4px rgba(255, 255, 255, 0.1);
+        }
+
+        .mode-button.red.active {
+            background: rgba(200, 60, 60, 0.9);
+            box-shadow: 0 0 0 3px #000, 0 0 0 4px #333,
+                        0 0 20px rgba(200, 60, 60, 0.8),
+                        inset 2px 2px 4px rgba(0, 0, 0, 0.3),
+                        inset -2px -2px 4px rgba(255, 255, 255, 0.1);
+        }
+
+        .logo {
+            color: #ff0000;
+            font-size: 42px;
+            font-weight: bold;
+            letter-spacing: 10px;
+            text-shadow: 0 0 20px rgba(255, 0, 0, 0.8);
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .radio-status {
+            color: #ff0000;
+            font-size: 14px;
+            text-align: center;
+            margin-top: 20px;
+            min-height: 20px;
+        }
+
+        /* スマホ対応 */
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            .logo {
+                font-size: 28px;
+                letter-spacing: 6px;
+                margin-bottom: 10px;
+            }
+
+            .radio-display {
+                padding: 10px 15px;
+                margin-bottom: 15px;
+            }
+
+            .display-screen {
+                padding: 8px 12px;
+                min-height: 50px;
+            }
+
+            .station-name {
+                font-size: 18px;
+            }
+
+            .station-freq {
+                font-size: 11px;
+            }
+
+            .dashboard {
+                padding: 15px;
+                border-width: 2px;
+            }
+
+            .main-layout {
+                grid-template-columns: 60px 1fr 60px;
+                gap: 10px;
+            }
+
+            .left-buttons, .right-buttons {
+                padding: 30px 0;
+            }
+
+            .side-button {
+                width: 60px;
+                height: 36px;
+                font-size: 10px;
+                transform: scaleY(1.2);
+            }
+
+            .bars-container {
+                height: 280px;
+                gap: 12px;
+                padding: 10px 15px;
+            }
+
+            .bar {
+                width: 35px;
+            }
+
+            .segment {
+                height: 14px;
+            }
+
+            .bar-half {
+                gap: 2px;
+            }
+
+            .bottom-controls {
+                grid-template-columns: 12px 1fr 90px;
+                gap: 10px;
+                padding: 0 15px;
+                margin-top: 10px;
+            }
+
+            .yellow-indicator {
+                gap: 12px;
+            }
+
+            .indicator-segment {
+                width: 12px;
+                height: 36px;
+                transform: scaleY(1.2);
+            }
+
+            .mode-buttons {
+                gap: 12px;
+            }
+
+            .mode-button {
+                height: 36px;
+                font-size: 12px;
+                transform: scaleY(1.2);
+            }
+
+            .radio-status {
+                font-size: 12px;
+                margin-top: 15px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .main-layout {
+                grid-template-columns: 50px 1fr 50px;
+                gap: 8px;
+            }
+
+            .side-button {
+                width: 50px;
+                height: 32px;
+                font-size: 9px;
+            }
+
+            .bars-container {
+                height: 240px;
+                gap: 8px;
+            }
+
+            .bar {
+                width: 28px;
+            }
+
+            .segment {
+                height: 12px;
+            }
+
+            .bottom-controls {
+                grid-template-columns: 10px 1fr 80px;
+            }
+
+            .mode-button {
+                font-size: 10px;
+            }
+
+            .station-name {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <!-- レトロラジオ表示部 -->
+        <div class="radio-display">
+            <div class="display-screen display-off" id="displayScreen">
+                <div class="station-name" id="stationName">- - - - -</div>
+                <div class="station-freq" id="stationFreq">STANDBY</div>
+            </div>
+            <div class="radio-indicators">
+                <div class="indicator-led" id="powerLed"></div>
+                <div class="indicator-led stereo" id="stereoLed"></div>
+            </div>
+        </div>
+        
+        <div class="dashboard">
+            <div class="main-layout">
+                <div class="left-buttons">
+                    <div class="side-button yellow" id="btn-news" onclick="toggleStation('news')">ALT</div>
+                    <div class="side-button yellow" id="btn-sixties" onclick="toggleStation('sixties')">OIL<br>PRESS</div>
+                    <div class="side-button orange" id="btn-seventies" onclick="toggleStation('seventies')">OIL<br>TEMP</div>
+                    <div class="side-button orange" id="btn-fifties" onclick="toggleStation('fifties')">EGT</div>
+                    <div class="side-button orange" id="btn-uk" onclick="toggleStation('uk')">FUEL</div>
+                </div>
+
+                <div class="center-section">
+                    <div class="top-bar"></div>
+                    
+                    <div class="bars-container">
+                        <div class="bar" id="bar1"></div>
+                        <div class="bar" id="bar2"></div>
+                        <div class="bar" id="bar3"></div>
+                    </div>
+                    
+                    <div class="bottom-bar"></div>
+                    
+                    <div class="bottom-controls">
+                        <div class="yellow-indicator">
+                            <div class="indicator-segment"></div>
+                            <div class="indicator-segment"></div>
+                            <div class="indicator-segment"></div>
+                        </div>
+                        <div class="spacer"></div>
+                        <div class="mode-buttons">
+                            <div class="mode-button green" onclick="toggleRadio()">NORMAL<br>CRUISE</div>
+                            <div class="mode-button yellow" onclick="toggleClassical()">AUTO<br>CRUISE</div>
+                            <div class="mode-button red" onclick="toggleRock()">PURSUIT</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="right-buttons">
+                    <div class="side-button yellow" id="btn-japan" onclick="toggleStation('japan')">AUX</div>
+                    <div class="side-button yellow" id="btn-eighties" onclick="toggleStation('eighties')">SAT<br>COMM</div>
+                    <div class="side-button orange" id="btn-nineties" onclick="toggleStation('nineties')">ACC</div>
+                    <div class="side-button orange" id="btn-country" onclick="toggleStation('country')">RADAR</div>
+                    <div class="side-button orange" id="btn-jazz" onclick="toggleStation('jazz')">MPI</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <audio id="radio" crossorigin="anonymous"></audio>
+
+    <script>
+        let animationFrame = null;
+        let idleAnimationTime = 0;
+        let audioContext = null;
+        let analyser = null;
+        let dataArray = null;
+        let audioElement = null;
+        let source = null;
+        let isPlaying = false;
+        let currentStation = null;
+
+        const STATIONS = {
+            uktop40: {
+                url: 'http://listen.181fm.com/181-uktop40_128k.mp3',
+                name: '181.FM UK Top40',
+                freq: '181.0 MHz - POP HITS'
+            },
+            classical: {
+                url: 'http://listen.181fm.com/181-classical_128k.mp3',
+                name: '181.FM Classical',
+                freq: '181.1 MHz - CLASSICAL'
+            },
+            rock: {
+                url: 'http://listen.181fm.com/181-rock_128k.mp3',
+                name: '181.FM Rock',
+                freq: '181.2 MHz - ROCK'
+            },
+            // 左側ボタン用
+            news: {
+                url: 'http://listen.181fm.com/181-thebox_128k.mp3',
+                name: '181.FM The Box',
+                freq: 'NEWS/TALK'
+            },
+            sixties: {
+                url: 'http://listen.181fm.com/181-oldschool_128k.mp3',
+                name: '181.FM Old School',
+                freq: '60s - OLD SCHOOL'
+            },
+            seventies: {
+                url: 'http://listen.181fm.com/181-70s_128k.mp3',
+                name: '181.FM 70s',
+                freq: '181.7 MHz - 70s HITS'
+            },
+            fifties: {
+                url: 'http://listen.181fm.com/181-goodtime_128k.mp3',
+                name: '181.FM Good Time',
+                freq: '181.5 MHz - 50s/60s'
+            },
+            uk: {
+                url: 'http://listen.181fm.com/181-beatles_128k.mp3',
+                name: '181.FM Beatles',
+                freq: 'UK - BRITISH INVASION'
+            },
+            // 右側ボタン用
+            japan: {
+                url: 'http://listen.181fm.com/181-power_128k.mp3',
+                name: '181.FM Power',
+                freq: 'POWER - HITS'
+            },
+            eighties: {
+                url: 'http://listen.181fm.com/181-awesome80s_128k.mp3',
+                name: '181.FM Awesome 80s',
+                freq: '80s - AWESOME'
+            },
+            nineties: {
+                url: 'http://listen.181fm.com/181-90srnb_128k.mp3',
+                name: '181.FM 90s RnB',
+                freq: '90s - R&B'
+            },
+            country: {
+                url: 'http://listen.181fm.com/181-kickincountry_128k.mp3',
+                name: '181.FM Kickin Country',
+                freq: 'KICKIN COUNTRY'
+            },
+            jazz: {
+                url: 'http://listen.181fm.com/181-bebop_128k.mp3',
+                name: '181.FM BeBop Jazz',
+                freq: 'JAZZ - BEBOP'
+            }
+        };
+
+        function updateDisplay(station) {
+            const screen = document.getElementById('displayScreen');
+            const nameEl = document.getElementById('stationName');
+            const freqEl = document.getElementById('stationFreq');
+            const powerLed = document.getElementById('powerLed');
+            const stereoLed = document.getElementById('stereoLed');
+            
+            if (station) {
+                screen.classList.remove('display-off');
+                nameEl.textContent = station.name;
+                freqEl.textContent = station.freq;
+                powerLed.classList.add('active');
+                stereoLed.classList.add('active');
+            } else {
+                screen.classList.add('display-off');
+                nameEl.textContent = '- - - - -';
+                freqEl.textContent = 'STANDBY';
+                powerLed.classList.remove('active');
+                stereoLed.classList.remove('active');
+            }
+        }
+
+        function initBars() {
+            for (let i = 1; i <= 3; i++) {
+                const bar = document.getElementById(`bar${i}`);
+                
+                const topHalf = document.createElement('div');
+                topHalf.className = 'bar-half top';
+                
+                const centerSegment = document.createElement('div');
+                centerSegment.className = 'segment center-segment';
+                
+                const bottomHalf = document.createElement('div');
+                bottomHalf.className = 'bar-half bottom';
+                
+                for (let j = 0; j < 9; j++) {
+                    const topSegment = document.createElement('div');
+                    topSegment.className = 'segment';
+                    topSegment.dataset.index = j;
+                    topHalf.appendChild(topSegment);
+                    
+                    const bottomSegment = document.createElement('div');
+                    bottomSegment.className = 'segment';
+                    bottomSegment.dataset.index = j;
+                    bottomHalf.appendChild(bottomSegment);
+                }
+                
+                bar.appendChild(topHalf);
+                bar.appendChild(centerSegment);
+                bar.appendChild(bottomHalf);
+            }
+        }
+
+        function updateBars(amplitudes) {
+            for (let i = 0; i < 3; i++) {
+                const bar = document.getElementById(`bar${i + 1}`);
+                const topSegments = bar.querySelector('.bar-half.top').querySelectorAll('.segment');
+                const centerSegment = bar.querySelector('.center-segment');
+                const bottomSegments = bar.querySelector('.bar-half.bottom').querySelectorAll('.segment');
+                const maxSegments = 9;
+                const litCount = Math.floor(amplitudes[i] * maxSegments);
+                
+                centerSegment.classList.remove('active', 'fade-1', 'fade-2', 'fade-3', 'fade-4');
+                if (litCount >= 1) {
+                    centerSegment.classList.add('active');
+                }
+                
+                [topSegments, bottomSegments].forEach(segments => {
+                    segments.forEach((segment, index) => {
+                        segment.classList.remove('active', 'fade-1', 'fade-2', 'fade-3', 'fade-4');
+                        
+                        if (index < litCount) {
+                            segment.classList.add('active');
+                        } else if (index === litCount) {
+                            segment.classList.add('fade-1');
+                        } else if (index === litCount + 1) {
+                            segment.classList.add('fade-2');
+                        } else if (index === litCount + 2) {
+                            segment.classList.add('fade-3');
+                        } else if (index === litCount + 3) {
+                            segment.classList.add('fade-4');
+                        }
+                    });
+                });
+            }
+        }
+
+        function idleAnimation() {
+            if (!isPlaying) {
+                updateBars([0, 0, 0]);
+            }
+            animationFrame = requestAnimationFrame(idleAnimation);
+        }
+
+        function audioAnimation() {
+            if (isPlaying && analyser) {
+                analyser.getByteFrequencyData(dataArray);
+                
+                const overall = dataArray.reduce((a, b) => a + b) / dataArray.length / 255;
+                const bass = dataArray.slice(1, 8).reduce((a, b) => a + b) / 7 / 255;
+                const mid = dataArray.slice(15, 40).reduce((a, b) => a + b) / 25 / 255;
+                const treble = dataArray.slice(60, 100).reduce((a, b) => a + b) / 40 / 255;
+                
+                const masterThreshold = 0.05;
+                if (overall < masterThreshold) {
+                    updateBars([0, 0, 0]);
+                    requestAnimationFrame(audioAnimation);
+                    return;
+                }
+                
+                let amplitudes;
+                
+                if (currentStation === 'classical') {
+                    const lowMid = dataArray.slice(8, 25).reduce((a, b) => a + b) / 17 / 255;
+                    const highMid = dataArray.slice(25, 60).reduce((a, b) => a + b) / 35 / 255;
+                    
+                    const thresholdClassical = 0.1;
+                    amplitudes = [
+                        Math.max(0, (Math.min(Math.pow(lowMid * 0.6 + overall * 0.4, 1.0) * 1.2, 0.8) - thresholdClassical) / (1 - thresholdClassical)),
+                        Math.max(0, (Math.min(Math.pow(bass, 1.5) * 0.8, 0.75) - thresholdClassical) / (1 - thresholdClassical)),
+                        Math.max(0, (Math.min(Math.pow(highMid * 0.6 + overall * 0.4, 1.0) * 1.2, 0.8) - thresholdClassical) / (1 - thresholdClassical))
+                    ];
+                } else {
+                    const midWithMaster = (mid * 0.5 + overall * 0.5);
+                    const trebleWithMaster = (treble * 0.5 + overall * 0.5);
+                    
+                    const thresholdMid = 0.15;
+                    const thresholdBass = 0.25;
+                    const thresholdTreble = 0.15;
+                    
+                    amplitudes = [
+                        Math.max(0, (Math.min(Math.pow(midWithMaster, 1.2) * 1.0, 0.75) - thresholdMid) / (1 - thresholdMid)),
+                        Math.max(0, (Math.min(Math.pow(bass, 2.0) * 0.6, 0.7) - thresholdBass) / (1 - thresholdBass)),
+                        Math.max(0, (Math.min(Math.pow(trebleWithMaster, 0.8) * 1.4, 0.85) - thresholdTreble) / (1 - thresholdTreble))
+                    ];
+                }
+                
+                updateBars(amplitudes);
+                requestAnimationFrame(audioAnimation);
+            }
+        }
+
+        function toggleRadio() {
+            if (isPlaying && currentStation === 'uktop40') {
+                stopRadio();
+            } else {
+                playRadio('uktop40');
+            }
+        }
+
+        function toggleClassical() {
+            if (isPlaying && currentStation === 'classical') {
+                stopRadio();
+            } else {
+                playRadio('classical');
+            }
+        }
+
+        function toggleNews() {
+            if (isPlaying && currentStation === 'news') {
+                stopRadio();
+            } else {
+                playRadio('news');
+            }
+        }
+
+        function toggleRock() {
+            if (isPlaying && currentStation === 'rock') {
+                stopRadio();
+            } else {
+                playRadio('rock');
+            }
+        }
+
+        function toggleStation(stationKey) {
+            if (isPlaying && currentStation === stationKey) {
+                stopRadio();
+            } else {
+                playRadio(stationKey);
+            }
+        }
+
+        function playRadio(stationKey) {
+            const station = STATIONS[stationKey];
+            
+            // 全てのボタンを消灯
+            document.querySelectorAll('.mode-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.side-button').forEach(btn => btn.classList.remove('active'));
+            
+            // 対応するボタンを点灯
+            if (stationKey === 'uktop40') {
+                document.querySelector('.mode-button.green').classList.add('active');
+            } else if (stationKey === 'classical') {
+                document.querySelector('.mode-button.yellow').classList.add('active');
+            } else if (stationKey === 'rock') {
+                document.querySelector('.mode-button.red').classList.add('active');
+            } else {
+                const btn = document.getElementById(`btn-${stationKey}`);
+                if (btn) btn.classList.add('active');
+            }
+            
+            updateDisplay(station);
+            
+            if (isPlaying) {
+                audioElement.pause();
+                audioElement.src = '';
+            }
+            
+            audioElement = document.getElementById('radio');
+            audioElement.src = station.url;
+            
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                const bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+                
+                source = audioContext.createMediaElementSource(audioElement);
+                source.connect(analyser);
+                analyser.connect(audioContext.destination);
+            }
+            
+            audioElement.play().then(() => {
+                isPlaying = true;
+                currentStation = stationKey;
+                audioAnimation();
+            }).catch(err => {
+                console.error('Playback error:', err);
+                document.querySelectorAll('.mode-button').forEach(btn => btn.classList.remove('active'));
+                updateDisplay(null);
+            });
+        }
+
+        function stopRadio() {
+            if (!isPlaying) return;
+            
+            audioElement.pause();
+            audioElement.src = '';
+            isPlaying = false;
+            currentStation = null;
+            document.querySelectorAll('.mode-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.side-button').forEach(btn => btn.classList.remove('active'));
+            updateDisplay(null);
+        }
+
+        window.onload = () => {
+            initBars();
+            idleAnimation();
+        };
+    </script>
+</body>
+</html>
