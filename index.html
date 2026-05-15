@@ -633,72 +633,98 @@
         let source = null;
         let isPlaying = false;
         let currentStation = null;
+        let wakeLock = null;
+
+        async function requestWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    wakeLock.addEventListener('release', () => { wakeLock = null; });
+                } catch (err) {
+                    console.log('Wake Lock failed:', err);
+                }
+            }
+        }
+
+        function releaseWakeLock() {
+            if (wakeLock) {
+                wakeLock.release();
+                wakeLock = null;
+            }
+        }
+
+        // ページが再表示されたときにWake Lockを再取得
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && isPlaying) {
+                requestWakeLock();
+            }
+        });
 
         const STATIONS = {
             uktop40: {
-                url: 'http://listen.181fm.com/181-uktop40_128k.mp3',
+                url: 'https://listen.181fm.com/181-uktop40_128k.mp3',
                 name: '181.FM UK Top40',
                 freq: '181.0 MHz - POP HITS'
             },
             classical: {
-                url: 'http://listen.181fm.com/181-classical_128k.mp3',
+                url: 'https://listen.181fm.com/181-classical_128k.mp3',
                 name: '181.FM Classical',
                 freq: '181.1 MHz - CLASSICAL'
             },
             rock: {
-                url: 'http://listen.181fm.com/181-rock_128k.mp3',
+                url: 'https://listen.181fm.com/181-rock_128k.mp3',
                 name: '181.FM Rock',
                 freq: '181.2 MHz - ROCK'
             },
             // 左側ボタン用
             news: {
-                url: 'http://listen.181fm.com/181-thebox_128k.mp3',
+                url: 'https://listen.181fm.com/181-thebox_128k.mp3',
                 name: '181.FM The Box',
                 freq: 'NEWS/TALK'
             },
             sixties: {
-                url: 'http://listen.181fm.com/181-oldschool_128k.mp3',
+                url: 'https://listen.181fm.com/181-oldschool_128k.mp3',
                 name: '181.FM Old School',
                 freq: '60s - OLD SCHOOL'
             },
             seventies: {
-                url: 'http://listen.181fm.com/181-70s_128k.mp3',
+                url: 'https://listen.181fm.com/181-70s_128k.mp3',
                 name: '181.FM 70s',
                 freq: '181.7 MHz - 70s HITS'
             },
             fifties: {
-                url: 'http://listen.181fm.com/181-goodtime_128k.mp3',
+                url: 'https://listen.181fm.com/181-goodtime_128k.mp3',
                 name: '181.FM Good Time',
                 freq: '181.5 MHz - 50s/60s'
             },
             uk: {
-                url: 'http://listen.181fm.com/181-beatles_128k.mp3',
+                url: 'https://listen.181fm.com/181-beatles_128k.mp3',
                 name: '181.FM Beatles',
                 freq: 'UK - BRITISH INVASION'
             },
             // 右側ボタン用
             japan: {
-                url: 'http://listen.181fm.com/181-power_128k.mp3',
+                url: 'https://listen.181fm.com/181-power_128k.mp3',
                 name: '181.FM Power',
                 freq: 'POWER - HITS'
             },
             eighties: {
-                url: 'http://listen.181fm.com/181-awesome80s_128k.mp3',
+                url: 'https://listen.181fm.com/181-awesome80s_128k.mp3',
                 name: '181.FM Awesome 80s',
                 freq: '80s - AWESOME'
             },
             nineties: {
-                url: 'http://listen.181fm.com/181-90srnb_128k.mp3',
+                url: 'https://listen.181fm.com/181-90srnb_128k.mp3',
                 name: '181.FM 90s RnB',
                 freq: '90s - R&B'
             },
             country: {
-                url: 'http://listen.181fm.com/181-kickincountry_128k.mp3',
+                url: 'https://listen.181fm.com/181-kickincountry_128k.mp3',
                 name: '181.FM Kickin Country',
                 freq: 'KICKIN COUNTRY'
             },
             jazz: {
-                url: 'http://listen.181fm.com/181-bebop_128k.mp3',
+                url: 'https://listen.181fm.com/181-bebop_128k.mp3',
                 name: '181.FM BeBop Jazz',
                 freq: 'JAZZ - BEBOP'
             }
@@ -930,6 +956,7 @@
             audioElement.play().then(() => {
                 isPlaying = true;
                 currentStation = stationKey;
+                requestWakeLock();
                 audioAnimation();
             }).catch(err => {
                 console.error('Playback error:', err);
@@ -945,6 +972,7 @@
             audioElement.src = '';
             isPlaying = false;
             currentStation = null;
+            releaseWakeLock();
             document.querySelectorAll('.mode-button').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.side-button').forEach(btn => btn.classList.remove('active'));
             updateDisplay(null);
